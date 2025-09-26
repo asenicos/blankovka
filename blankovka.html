@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+	<title>Поиск листа карты Генштаба по координатам (бланковка, разграфка)</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="Author" content="front@asenic.ru"><meta name="Reply-to" content="front@asenic.ru">
+	<meta name="Description" content="Поиск листа карты Генштаба по координатам (бланковка, разграфка).">
+	<meta name="Keywords" content="Генштаб, карта, бланковка, разграфка, номенклатура, координаты">
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<link rel="SHORTCUT ICON" href="../f.ico">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+	<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <style>
+        #map {
+            height: 100vh; /* Высота карты на весь экран */
+            width: 100%; /* Ширина карты на весь экран */
+        }
+		#coordinates {
+            position: absolute;
+            bottom: 3%;
+            left: 92%;
+            background: rgba(255, 255, 255, 0.7); /* Полупрозрачный фон */
+            padding: 5px;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body bgcolor="#FFFFcc" text="#666666" link="#999966" vlink="#CC9999" alink="#99CC99">
+    <div id="map"></div>
+	<div id="coordinates"></div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+	<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <script>
+        // Создание карты и установка начальной позиции и уровня зума
+        var map = L.map('map').setView([55.7558, 37.6173], 10); // Координаты Москвы
+
+        // Добавление слоя с картой OSM
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+		// Добавление шкалы масштаба
+    	L.control.scale().addTo(map);
+		// Добавление элемента управления для поиска
+    	const geocoder = L.Control.Geocoder.nominatim();
+    	L.Control.geocoder({
+        	defaultMarkGeocode: false,
+        	collapsed: false
+    	})
+    	.on('markgeocode', function(e) {
+        	const latlng = e.geocode.center;
+        	L.marker(latlng).addTo(map).bindPopup(e.geocode.name).openPopup();
+        	map.setView(latlng, 13);
+    	})
+    	.addTo(map);
+		
+		// Обновление координат при движении мыши
+		map.on('mousemove', function(e) {
+        	const coordsDiv = document.getElementById('coordinates');
+        	coordsDiv.innerHTML = `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
+    	});
+       
+	
+		// Функция для получения названия карты Генштаба по координатам
+		function getMapNames(lat, lng) {
+    // Определяем ряд (буква) и колонну (цифра) для масштаба 1:1 000 000
+    		if (lat >= 0) {var row = String.fromCharCode(65 + Math.floor(lat) / 4)} else {var row = String.fromCharCode(65 + Math.floor(-lat) / 4)}; // 'A' - 'Z'
+			var column = Math.floor((lng + 180) / 6) + 1; // Колонны от 1 до 30
+
+    // Формируем название для масштаба 1:1 000 000
+    		if (lat >= 0) {var sheet1000000 = `${row}-${column}`} else {var sheet1000000 = `(Ю.П.) ${row}-${column}`};
+				var sheet=`${sheet1000000}`;
+			if (column % 2 === 0 && lat >= 60 && lat <= 76) {var sheet1000000 = `${row}-${column-1},${column}`};
+			if (column % 2 === 1 && lat >= 60 && lat <= 76) {var sheet1000000 = `${row}-${column},${column+1}`};
+			if (column % 2 === 0 && lat <= -60 && lat >= -76) {var sheet1000000 = `(Ю.П.) ${row}-${column-1},${column}`};
+			if (column % 2 === 1 && lat <= -60 && lat >= -76) {var sheet1000000 = `(Ю.П.) ${row}-${column},${column+1}`};
+			if (lat > 76) {var sheet1000000 = `${row}-${column-3},${column-2},${column-1},${column}`}; //Работает не корректно, но кому это надо - нет этих листов всё равно
+			if (lat < -76) {var sheet1000000 = `(Ю.П.) ${row}-${column-3},${column-2},${column-1},${column}`}; //Работает не корректно, но кому это надо - нет этих листов всё равно
+
+   // Для масштаба 1:500 000 добавляем букву (по широте и долготе)
+			var latQuarter = ((lat + 90) % 4) < 2 ? 0 : 1; // 0 для первой половины, 1 для второй половины 4-градусной полосы
+            var lngQuarter = ((lng + 180) % 6) < 3 ? 0 : 1; // 0 для первой половины, 1 для второй половины 6-градусной полосы
+            var quarterLetters = [
+                    ['А', 'Б'],
+                    ['В', 'Г']
+                ];
+            var sheet500000 = `${sheet}-${quarterLetters[latQuarter][lngQuarter]}`;
+
+	// Для масштаба 1:200 000 добавляем римскую цифру
+	// Определяем номер квадрата в масштабе 1:1000000
+			var row = 5-Math.floor(6*((lat/4)-Math.floor(lat/4))); 
+			var col = Math.floor(lng) %6;  //works well
+     // Нумерация квадратов Генштаба
+    		var sheetNumbers = [
+        "I", "II", "III", "IV", "V", "VI",
+        "VII", "VIII", "IX", "X", "XI", "XII",
+        "XIII", "XIV", "XV", "XVI", "XVII", "XVIII",
+        "XIX", "XX", "XXI", "XXII", "XXIII", "XXIV",
+        "XXV", "XXVI", "XXVII", "XXVIII", "XXIX", "XXX",
+        "XXXI", "XXXII", "XXXIII", "XXXIV", "XXXV", "XXXVI"
+    		];
+    		var sheetIndex = row * 6 + col; // Индекс от 0 до 35
+			if (sheetIndex < 0 || sheetIndex >= sheetNumbers.length) {
+        			return null; // Если координаты вне диапазона
+    				}
+    	// Название листа масштаба 1:200000
+    		var sheet200000 = `${sheet1000000}-${sheetNumbers[sheetIndex]}`;
+
+    // Для масштаба 1:100 000 добавляем число от 1 до 144
+    		var numberIndex = (11-Math.floor(12*((lat/4)-Math.floor(lat/4)))) * 12 + Math.floor(12*(lng/6-Math.floor(lng/6)))+1; // Определяем номер от 1 до 144
+    		var sheet100000 = `${sheet1000000}-${numberIndex}`;
+		
+    		return {
+        		sheet1000000,
+        		sheet500000,
+        		sheet200000,
+        		sheet100000
+    			};
+}
+		
+        // Обработчик события клика по карте
+        map.on('click', function(e) {
+            var lat = e.latlng.lat;
+            var lng = e.latlng.lng;
+            var {sheet1000000, sheet100000, sheet200000, sheet500000} = getMapNames(lat, lng);
+
+            var content = `Координаты: ${lat.toFixed(5)}, ${lng.toFixed(5)}<br><br> 
+                          <strong>Названия листов карт Генштаба:</strong><br> 
+                          1:1000000: ${sheet1000000}<br> 
+                          1:500000: ${sheet500000}<br> 
+                          1:200000: ${sheet200000}<br> 
+						  1:100000: ${sheet100000}`;
+
+            if (content) {
+                L.popup()
+                    .setLatLng(e.latlng)
+                    .setContent(content)
+                    .openOn(map);
+            } else {
+                console.error("Содержимое для всплывающего окна пусто.");
+            }
+        });
+    </script>
+	<h1>Поиск листа карты Генштаба по координатам (бланковка, разграфка).</h1>
+</body>
+</html>
